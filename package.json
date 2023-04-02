@@ -1,0 +1,72 @@
+{
+  "name": "@brielov/typed",
+  "version": "0.0.3",
+  "main": "dist/core.cjs",
+  "module": "dist/core.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "private": false,
+  "exports": {
+    ".": {
+      "import": "./dist/typed.js",
+      "require": "./dist/typed.cjs",
+      "types": "./dist/index.d.ts"
+    },
+    "./array": {
+      "import": "./dist/array.js",
+      "require": "./dist/array.cjs",
+      "types": "./dist/array.d.ts"
+    },
+    "./option": {
+      "import": "./dist/option.js",
+      "require": "./dist/option.cjs",
+      "types": "./dist/option.d.ts"
+    },
+    "./result": {
+      "import": "./dist/result.js",
+      "require": "./dist/result.cjs",
+      "types": "./dist/result.d.ts"
+    },
+    "./parser": {
+      "import": "./dist/parser.js",
+      "require": "./dist/parser.cjs",
+      "types": "./dist/parser.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rimraf dist && vite build",
+    "test": "vitest run",
+    "dev": "vitest",
+    "lint": "tsc",
+    "prepack": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/brielov/typed.git"
+  },
+  "keywords": [],
+  "author": "Gabriel Vaquer",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/brielov/typed/issues"
+  },
+  "homepage": "https://github.com/brielov/typed#readme",
+  "description": "",
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^5.57.0",
+    "@typescript-eslint/parser": "^5.57.0",
+    "@vitest/coverage-c8": "^0.29.8",
+    "eslint": "^8.37.0",
+    "eslint-config-prettier": "^8.8.0",
+    "eslint-plugin-prettier": "^4.2.1",
+    "prettier": "^2.8.7",
+    "rimraf": "^4.4.1",
+    "typescript": "^5.0.3",
+    "vite": "^4.2.1",
+    "vite-plugin-dts": "^2.1.0",
+    "vitest": "^0.29.8"
+  }
+}
