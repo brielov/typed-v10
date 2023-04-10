@@ -1,8 +1,8 @@
 {
   "name": "@brielov/typed",
   "version": "0.0.3",
-  "main": "dist/core.cjs",
-  "module": "dist/core.js",
+  "main": "dist/typed.cjs",
+  "module": "dist/typed.js",
   "types": "dist/index.d.ts",
   "type": "module",
   "private": false,
@@ -11,26 +11,6 @@
       "import": "./dist/typed.js",
       "require": "./dist/typed.cjs",
       "types": "./dist/index.d.ts"
-    },
-    "./array": {
-      "import": "./dist/array.js",
-      "require": "./dist/array.cjs",
-      "types": "./dist/array.d.ts"
-    },
-    "./option": {
-      "import": "./dist/option.js",
-      "require": "./dist/option.cjs",
-      "types": "./dist/option.d.ts"
-    },
-    "./result": {
-      "import": "./dist/result.js",
-      "require": "./dist/result.cjs",
-      "types": "./dist/result.d.ts"
-    },
-    "./parser": {
-      "import": "./dist/parser.js",
-      "require": "./dist/parser.cjs",
-      "types": "./dist/parser.d.ts"
     }
   },
   "files": [
@@ -56,17 +36,17 @@
   "homepage": "https://github.com/brielov/typed#readme",
   "description": "",
   "devDependencies": {
-    "@typescript-eslint/eslint-plugin": "^5.57.0",
-    "@typescript-eslint/parser": "^5.57.0",
-    "@vitest/coverage-c8": "^0.29.8",
-    "eslint": "^8.37.0",
+    "@typescript-eslint/eslint-plugin": "^5.57.1",
+    "@typescript-eslint/parser": "^5.57.1",
+    "@vitest/coverage-c8": "^0.30.0",
+    "eslint": "^8.38.0",
     "eslint-config-prettier": "^8.8.0",
     "eslint-plugin-prettier": "^4.2.1",
     "prettier": "^2.8.7",
     "rimraf": "^4.4.1",
-    "typescript": "^5.0.3",
+    "typescript": "^5.0.4",
     "vite": "^4.2.1",
-    "vite-plugin-dts": "^2.1.0",
-    "vitest": "^0.29.8"
+    "vite-plugin-dts": "^2.2.0",
+    "vitest": "^0.30.0"
   }
 }

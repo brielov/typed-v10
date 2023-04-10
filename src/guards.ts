@@ -170,7 +170,7 @@ export const isPlainObject = (value: unknown): value is PlainObject => {
 
 /**
  * Determines whether a value is iterable.
-
+ *
  * @param {unknown} value - The value to check.
  * @returns {boolean} - `true` if the value is iterable; otherwise, `false`.
  */

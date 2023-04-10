@@ -1,3 +1,6 @@
+import type { ParseError, Parser } from "./parsing";
+import { Result } from "./result";
+
 /**
  * Throws an error with the provided message or the message of the provided error.
  *
@@ -25,6 +28,21 @@ export const assert = (
   msg = "Assertion failed",
 ): asserts condition => {
   if (!condition) raise(msg);
+};
+
+export const identity = <T>(value: T): T => value;
+
+type JsonParseError = SyntaxError | TypeError | RangeError;
+
+export const parseJson = <T>(
+  json: string,
+  parser: Parser<T>,
+): Result<T, JsonParseError | ParseError> => {
+  const result = Result.from(() => JSON.parse(json)) as Result<
+    unknown,
+    JsonParseError
+  >;
+  return result.andThen(parser);
 };
 
 export enum Type {

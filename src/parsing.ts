@@ -6,43 +6,28 @@ import {
   isNumber,
   isPlainObject,
   isString,
+  isUUID,
   isValidDate,
   isValidNumber,
 } from "./guards";
+import { List } from "./list";
 import type { Option } from "./option";
 import { None, Some } from "./option";
 import type { Result } from "./result";
-import { Err, Ok, andThen, isErr, isOk, map as mapResult } from "./result";
+import { Err, Ok } from "./result";
 import type { Literal, PlainObject } from "./types";
 import { Type, getTypeOf } from "./util";
-
-/**
- * The ParserError type represents an error that can occur during parsing.
- * @typedef {Object} ParserError
- * @property {string} actual - The actual type of the input.
- * @property {string} expected - The expected type of the input.
- * @property {unknown} input - The input value that caused the error.
- * @property {string} message - A message describing the error.
- * @property {string[]} path - An array representing the path to the value that caused the error.
- */
-export type ParserError = {
-  actual: string;
-  expected: string;
-  input: unknown;
-  message: string;
-  path: string[];
-};
 
 /**
  * A Parser is a function that takes an input value of type I and returns a Result object
  * containing either the parsed output value of type O or a ParserError object if parsing failed.
  * @template {unknown} I - The type of the input value.
  * @template {unknown} O - The type of the output value.
- * @typedef {function(I): Result<O, ParserError>} Parser
+ * @typedef {function(I): Result<O, ParseError>} Parser
  */
-export type Parser<out O = unknown, in I = unknown> = (
+export type Parser<O = unknown, I = unknown> = (
   input: I,
-) => Result<O, ParserError>;
+) => Result<O, ParseError>;
 
 /**
  * The Infer type extracts the output type U of a Parser<T> type.
@@ -59,17 +44,31 @@ export type Infer<T> = T extends Parser<infer U> ? U : never;
 type Shape<T extends PlainObject> = { [K in keyof T]: Parser<T[K]> };
 
 /**
- * The InferTuple type extracts the output types of all the Parser functions in a tuple.
- * @template {Parser[]} Tuple - The type of the tuple to infer from.
- * @template {number} Length - The length of the tuple.
- * @typedef {Tuple extends Parser[] ? Length extends number ? number extends Length ? Tuple : _InferTuple<Tuple, Length, []> : never : never : never} InferTuple
+ * Borrowed from `superstruct`
+ * @see https://github.com/ianstormtaylor/superstruct/blob/28e0b32d5506a7c73e63f7e718b23977e58aac18/src/utils.ts#L393
  */
-type InferTuple<T> = T extends Array<infer U> ? Infer<U> : never;
+export type InferTuple<
+  Tuple extends Parser[],
+  Length extends number = Tuple["length"],
+> = Length extends Length
+  ? number extends Length
+    ? Tuple
+    : _InferTuple<Tuple, Length, []>
+  : never;
+
+export type _InferTuple<
+  Tuple extends Parser[],
+  Length extends number,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Accumulated extends any[],
+  Index extends number = Accumulated["length"],
+> = Index extends Length
+  ? Accumulated
+  : _InferTuple<Tuple, Length, [...Accumulated, Infer<Tuple[Index]>]>;
 
 /**
- * The UnionToIntersection type takes a union type U and returns an intersection type.
- * @template {unknown} U - The union type to convert.
- * @typedef {(U extends any ? (arg: U) => any : never) extends (arg: infer I) => void ? I : never} UnionToIntersection
+ * Borrowed from `superstruct`
+ * @see https://github.com/ianstormtaylor/superstruct/blob/28e0b32d5506a7c73e63f7e718b23977e58aac18/src/utils.ts#L200
  */
 export type UnionToIntersection<U> =
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -78,21 +77,41 @@ export type UnionToIntersection<U> =
     : never;
 
 /**
+ * The ParserError type represents an error that can occur during parsing.
+ * @typedef {Object} ParserError
+ * @property {string} actual - The actual type of the input.
+ * @property {string} expected - The expected type of the input.
+ * @property {unknown} input - The input value that caused the error.
+ * @property {string} message - A message describing the error.
+ * @property {string[]} path - An array representing the path to the value that caused the error.
+ */
+export class ParseError extends Error {
+  constructor(
+    message: string,
+    public readonly expected: string,
+    public readonly actual: string,
+    public readonly input: unknown,
+    public readonly path: string[] = [],
+  ) {
+    super(message);
+  }
+}
+
+/**
  * Creates a ParserError object for a given expected type and input value.
 
  * @param {string} expected - The expected type of the input value.
  * @param {unknown} input - The input value that caused the error.
- * @returns {ParserError} A new ParserError object.
+ * @returns {ParseError} A new ParserError object.
  */
-const typeErr = (expected: string, input: unknown): ParserError => {
+const typeErr = (expected: string, input: unknown): ParseError => {
   const actual = getTypeOf(input);
-  return {
-    path: [],
-    message: `Type '${actual}' is not assignable to type '${expected}'`,
+  return new ParseError(
+    `Type '${actual}' is not assignable to type '${expected}'`,
     expected,
     actual,
     input,
-  };
+  );
 };
 
 /**
@@ -159,7 +178,7 @@ export const date =
 export const optional =
   <T>(parser: Parser<T>): Parser<Option<T>> =>
   (input) =>
-    isNil(input) ? Ok(None) : mapResult(parser(input), Some);
+    isNil(input) ? Ok(None) : parser(input).map(Some);
 
 /**
  * Returns a parser function that returns a default value if the input is null or undefined.
@@ -188,11 +207,12 @@ export const array =
     const arr: T[] = Array(input.length);
     for (let i = 0; i < arr.length; i++) {
       const res = parser(input[i]);
-      if (isErr(res)) {
-        res.error.path.unshift(i.toString());
-        return res;
+      if (res.isErr()) {
+        const err = res.unwrapErr();
+        err.path.unshift(i.toString());
+        return Err(err);
       }
-      arr[i] = res.value;
+      arr[i] = res.unwrap();
     }
     return Ok(arr);
   };
@@ -211,11 +231,12 @@ export const object =
     const obj = Object.create(null);
     for (const key in shape) {
       const res = shape[key](input[key as string]);
-      if (isErr(res)) {
-        res.error.path.unshift(key);
-        return res;
+      if (res.isErr()) {
+        const err = res.unwrapErr();
+        err.path.unshift(key);
+        return Err(err);
       }
-      obj[key] = res.value;
+      obj[key] = res.unwrap();
     }
     return Ok(obj);
   };
@@ -241,16 +262,18 @@ export const record =
     const obj = Object.create(null);
     for (const key in input) {
       const kres = keyParser(key);
-      if (isErr(kres)) {
-        kres.error.path.unshift(key);
-        return kres;
+      if (kres.isErr()) {
+        const err = kres.unwrapErr();
+        err.path.unshift(key);
+        return Err(err);
       }
       const vres = valueParser(input[key]);
-      if (isErr(vres)) {
-        vres.error.path.unshift(key);
-        return vres;
+      if (vres.isErr()) {
+        const err = vres.unwrapErr();
+        err.path.unshift(key);
+        return Err(err);
       }
-      obj[kres.value] = vres.value;
+      obj[kres.unwrap()] = vres.unwrap();
     }
     return Ok(obj);
   };
@@ -267,7 +290,7 @@ export const record =
 export const chain =
   <T>(parser: Parser<T>, ...fns: ((value: T) => T)[]): Parser<T> =>
   (input) =>
-    andThen(parser(input), (value) => Ok(fns.reduce((v, f) => f(v), value)));
+    parser(input).andThen((value) => Ok(fns.reduce((v, f) => f(v), value)));
 
 /**
  * Takes a `Parser` and a function that maps its output to a new value, and returns a new `Parser` that applies the function to the output of the original parser.
@@ -275,16 +298,16 @@ export const chain =
  * @template T - The type of the input to the original parser.
  * @template O - The type of the output of the new parser.
  * @param {Parser<T>} parser - The original `Parser` to apply the mapping function to.
- * @param {(value: T) => Result<O, ParserError>} f - The function to apply to the output of the original `Parser`. It takes the output value as input and returns either a `Result` containing the new output value or a `ParserError`.
+ * @param {(value: T) => Result<O, ParseError>} f - The function to apply to the output of the original `Parser`. It takes the output value as input and returns either a `Result` containing the new output value or a `ParserError`.
  * @returns {Parser<O>} - A new `Parser` that applies the mapping function to the output of the original `Parser`.
  */
 export const map =
   <T, O>(
     parser: Parser<T>,
-    f: (value: T) => Result<O, ParserError>,
+    f: (value: T) => Result<O, ParseError>,
   ): Parser<O> =>
   (input) =>
-    andThen(parser(input), f);
+    parser(input).andThen(f);
 
 /**
  * Reutrns a parser that parses a string or number input and returns a value from an enum based on its key or value.
@@ -312,15 +335,15 @@ export const enums = <T extends { [key: string]: string | number }>(
  * @returns { Parser<Infer<A> & UnionToIntersection<InferTuple<B>[number]>> } - A new parser that produces the intersection of the results of each parser.
  */
 export const intersection =
-  <const A extends Parser<PlainObject>, const B extends Parser<PlainObject>[]>(
+  <A extends Parser<PlainObject>, B extends Parser<PlainObject>[]>(
     structs: [A, ...B],
   ): Parser<Infer<A> & UnionToIntersection<InferTuple<B>>> =>
   (input) => {
     const obj = Object.create(null);
     for (const struct of structs) {
       const res = struct(input);
-      if (isErr(res)) return res;
-      Object.assign(obj, res.value);
+      if (res.isErr()) return res;
+      Object.assign(obj, res.unwrap());
     }
     return Ok(obj);
   };
@@ -346,7 +369,7 @@ export const literal =
  * @returns { Parser<[Infer<A>, ...InferTuple<B>]> } - A new parser that produces a tuple with the results of each parser in the array.
  */
 export const tuple =
-  <const A extends Parser, const B extends Parser[]>(
+  <A extends Parser, B extends Parser[]>(
     parsers: [A, ...B],
   ): Parser<[Infer<A>, ...InferTuple<B>]> =>
   (input) => {
@@ -354,11 +377,12 @@ export const tuple =
     const arr = new Array(parsers.length);
     for (let i = 0; i < parsers.length; i++) {
       const res = parsers[i](input[i]);
-      if (isErr(res)) {
-        res.error.path.unshift(i.toString());
-        return res;
+      if (res.isErr()) {
+        const err = res.unwrapErr();
+        err.path.unshift(i.toString());
+        return Err(err);
       }
-      arr[i] = res.value;
+      arr[i] = res.unwrap();
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return Ok(arr as any);
@@ -375,14 +399,14 @@ export const tuple =
  * @returns {Parser<InferTuple<[A, B, ...C]>>} A parser that returns the value parsed by the first parser to match the input.
  */
 export const union =
-  <const A extends Parser, const B extends Parser, const C extends Parser[]>(
-    parsers: [A, B, ...C],
-  ): Parser<InferTuple<[A, B, ...C]>> =>
+  <A extends Parser, B extends Parser[]>(
+    parsers: [A, ...B],
+  ): Parser<InferTuple<[A, ...B]>> =>
   (input) => {
-    for (const struct of parsers) {
-      const res = struct(input);
+    for (const parser of parsers) {
+      const res = parser(input);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if (isOk(res)) return res as any;
+      if (res.isOk()) return res as any;
     }
     return Err(typeErr(parsers.map((s) => s.name).join(" | "), input));
   };
@@ -394,6 +418,9 @@ export const union =
  */
 export const unknown: Parser<unknown> = (input) => Ok(input);
 
+export const list = <T>(parser: Parser<T>): Parser<List<T>> =>
+  map(array(parser), (value) => Ok(List.from(value)));
+
 /**
  * Returns a `Parser` that parses an email address string.
  * The input string is first trimmed and converted to lowercase before being passed to `isEmail`.
@@ -402,7 +429,14 @@ export const unknown: Parser<unknown> = (input) => Ok(input);
  *
  * @returns {Parser<string>} - A `Parser` that parses an email address string.
  */
-export const email = map(
-  chain(string(), (s) => s.trim().toLowerCase()),
-  (v) => (isEmail(v) ? Ok(v) : Err(typeErr("email", v))),
-);
+export const email = (): Parser<string> =>
+  map(
+    chain(string(), (s) => s.trim().toLowerCase()),
+    (v) => (isEmail(v) ? Ok(v) : Err(typeErr("email", v))),
+  );
+
+export const uuid = (): Parser<string> =>
+  map(
+    chain(string(), (s) => s.trim().toUpperCase()),
+    (v) => (isUUID(v) ? Ok(v) : Err(typeErr("uuid", v))),
+  );
