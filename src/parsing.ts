@@ -342,7 +342,7 @@ export const enums = <T extends { [key: string]: string | number }>(
 export const intersection =
   <A extends Parser<PlainObject>, B extends Parser<PlainObject>[]>(
     structs: [A, ...B],
-  ): Parser<Infer<A> & UnionToIntersection<InferTuple<B>>> =>
+  ): Parser<Infer<A> & UnionToIntersection<InferTuple<B>[number]>> =>
   (input) => {
     const obj = Object.create(null);
     for (const struct of structs) {
