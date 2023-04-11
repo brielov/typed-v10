@@ -406,7 +406,7 @@ export const tuple =
 export const union =
   <A extends Parser, B extends Parser[]>(
     parsers: [A, ...B],
-  ): Parser<InferTuple<[A, ...B]>> =>
+  ): Parser<Infer<A> | InferTuple<B>[number]> =>
   (input) => {
     for (const parser of parsers) {
       const res = parser(input);
