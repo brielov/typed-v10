@@ -1,6 +1,6 @@
 {
   "name": "@brielov/typed",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "main": "dist/typed.cjs",
   "module": "dist/typed.js",
   "types": "dist/index.d.ts",
