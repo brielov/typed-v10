@@ -15,7 +15,7 @@ import type { Option } from "./option";
 import { None, Some } from "./option";
 import type { Result } from "./result";
 import { Err, Ok } from "./result";
-import type { Literal, PlainObject } from "./types";
+import type { Literal, Maybe, PlainObject } from "./types";
 import { Type, getTypeOf } from "./util";
 
 /**
@@ -192,6 +192,11 @@ export const defaulted =
   <T>(parser: Parser<T>, def: T): Parser<T> =>
   (input) =>
     isNil(input) ? Ok(def) : parser(input);
+
+export const maybe =
+  <T>(parser: Parser<T>): Parser<Maybe<T>> =>
+  (input) =>
+    isNil(input) ? Ok(input) : parser(input);
 
 /**
  * Returns a parser that parses an array of items of type `T` from the input using the given `parser`.
